@@ -1,26 +1,31 @@
-import tatMap from "../data/tat_map.json" assert { type: "json" };
+import fs from "fs";
+import path from "path";
 
 export default function handler(req, res) {
-  const { pickup_pincode, to_pincode } = req.query;
+  try {
+    const { pickup_pincode, to_pincode } = req.query;
 
-  if (!pickup_pincode || !to_pincode) {
-    return res.json({ edd: null });
-  }
+    if (!pickup_pincode || !to_pincode) {
+      return res.status(400).json({ error: "Missing pincodes" });
+    }
 
-  const key = `${pickup_pincode}_${to_pincode}`;
-  const tat = tatMap[key];
+    const __dirname = new URL(".", import.meta.url).pathname;
+    const tatMapPath = path.join(__dirname, "../data/tat_map.json");
+    const tatMap = JSON.parse(fs.readFileSync(tatMapPath, "utf8"));
 
-  if (!tat) {
-    return res.json({ edd: null });
-  }
+    const key = `${pickup_pincode}_${to_pincode}`;
+    const tat = tatMap[key];
 
-  const finalDays = Math.ceil(tat) + 1;
+    if (!tat) {
+      return res.status(200).json({ edd: null });
+    }
 
-  const edd = new Date();
-  edd.setDate(edd.getDate() + finalDays);
+    const finalDays = Number(tat) + 1; // +24 hrs buffer
 
-  res.json({
-    edd: edd.toISOString().split("T")[0]
-  });
-}
-                            
+    const eddDate = new Date();
+    eddDate.setDate(eddDate.getDate() + finalDays);
+
+    return res.status(200).json({
+      pickup_pincode,
+      to_pincode,
+      tat_days: Numb_
