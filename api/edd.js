@@ -3,32 +3,43 @@ import path from "path";
 
 export default function handler(req, res) {
   try {
-    const tatMapPath = path.join(process.cwd(), "data", "tat_map.json");
+    const pickup_pincode = req.query.pickup_pincode;
+    const to_pincode = req.query.to_pincode;
 
-    // DEBUG 1: file exists?
-    if (!fs.existsSync(tatMapPath)) {
-      return res.status(500).json({
-        error: "tat_map.json NOT FOUND",
-        looked_at: tatMapPath
+    if (!pickup_pincode || !to_pincode) {
+      return res.status(400).json({ error: "Missing pincodes" });
+    }
+
+    const filePath = path.join(process.cwd(), "data", "tat_map.json");
+    const raw = fs.readFileSync(filePath, "utf8");
+    const rows = JSON.parse(raw);
+
+    const row = rows.find(
+      r =>
+        String(r.pickup_pincode) === String(pickup_pincode) &&
+        String(r.to_pincode) === String(to_pincode)
+    );
+
+    if (!row) {
+      return res.status(200).json({
+        edd: null,
+        message: "EDD not available"
       });
     }
 
-    // DEBUG 2: read raw
-    const raw = fs.readFileSync(tatMapPath, "utf8");
+    const tatDays = Math.ceil(Number(row.tat)) + 1;
 
-    // DEBUG 3: parse JSON
-    const parsed = JSON.parse(raw);
+    const edd = new Date();
+    edd.setDate(edd.getDate() + tatDays);
 
     return res.status(200).json({
-      message: "JSON loaded successfully",
-      type: Array.isArray(parsed) ? "array" : typeof parsed,
-      sample: Array.isArray(parsed) ? parsed[0] : Object.keys(parsed)[0]
+      pickup_pincode,
+      to_pincode,
+      tat_days: tatDays,
+      edd: edd.toISOString().split("T")[0]
     });
 
-  } catch (err) {
-    return res.status(500).json({
-      error: "CRASH",
-      message: err.message
-    });
+  } catch (e) {
+    return res.status(500).json({ error: e.message });
   }
 }
