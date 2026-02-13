@@ -1,41 +1,53 @@
-import fs from "fs";
-import path from "path";
+import tatMap from "../data/tat_map.json" assert { type: "json" };
 
 export default function handler(req, res) {
+  // ✅ CORS headers (MOST IMPORTANT)
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+
+  // ✅ Handle preflight
+  if (req.method === "OPTIONS") {
+    return res.status(200).end();
+  }
+
   try {
-    const to_pincode = req.query.to_pincode;
+    const { to_pincode } = req.query;
 
     if (!to_pincode) {
-      return res.status(400).json({ error: "Missing pincode" });
+      return res.status(400).json({ error: "Missing pincodes" });
     }
 
-    const filePath = path.join(process.cwd(), "data", "tat_map.json");
-    const raw = fs.readFileSync(filePath, "utf8");
-    const rows = JSON.parse(raw);
-
-    const row = rows.find(
+    // 🔎 Find matching pincode in JSON
+    const record = tatMap.find(
       r => String(r.to_pincode) === String(to_pincode)
     );
 
-    if (!row) {
+    if (!record) {
       return res.status(200).json({
-        edd: null,
-        message: "EDD not available for this pincode"
+        to_pincode,
+        error: "Delivery not available"
       });
     }
 
-    const tatDays = Math.ceil(Number(row.tat)) + 1; // +24h buffer
+    // ➕ TAT + 1 day buffer
+    const tatDays = Math.ceil(Number(record.tat)) + 1;
 
-    const edd = new Date();
-    edd.setDate(edd.getDate() + tatDays);
+    const eddDate = new Date();
+    eddDate.setDate(eddDate.getDate() + tatDays);
+
+    const edd = eddDate.toISOString().split("T")[0];
 
     return res.status(200).json({
       to_pincode,
       tat_days: tatDays,
-      edd: edd.toISOString().split("T")[0]
+      edd
     });
 
-  } catch (e) {
-    return res.status(500).json({ error: e.message });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({
+      error: "EDD calculation failed"
+    });
   }
 }
